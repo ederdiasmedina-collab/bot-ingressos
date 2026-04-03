@@ -1,7 +1,6 @@
 import requests
 import time
 import random
-import threading
 from flask import Flask
 
 # 🔑 CONFIGURE AQUI
@@ -10,137 +9,109 @@ CHAT_ID = "5345823250"
 
 URLS = [
     ("Brasil x Marrocos", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891"),
-    ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917"),
+    ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917")
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1"
-}
-
+# 🌐 sessão persistente (MUITO IMPORTANTE)
 session = requests.Session()
+
+HEADERS_LIST = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"
+]
+
+def get_headers():
+    return {
+        "User-Agent": random.choice(HEADERS_LIST),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive"
+    }
 
 def enviar(msg):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        session.post(url, json={"chat_id": CHAT_ID, "text": msg}, timeout=10)
+        requests.post(url, json={
+            "chat_id": CHAT_ID,
+            "text": msg
+        }, timeout=10)
     except:
         print("Erro ao enviar mensagem")
 
-
-# 🧠 DETECÇÃO FINAL
+# 🔎 DETECÇÃO INTELIGENTE
 def detectar(html):
-    t = html.lower()
+    html_lower = html.lower()
 
-    # 🚫 bloqueios
-    if "captcha" in t or "queue" in t:
-        return "BLOQUEADO"
+    # 🚫 BLOQUEIO
+    if "captcha" in html_lower or "queue" in html_lower:
+        return "bloqueado"
 
-    if "access denied" in t:
-        return "BANIDO"
+    # 🔥 DISPONÍVEL (3 sinais fortes)
+    if (
+        "add to cart" in html_lower or
+        "buy tickets" in html_lower or
+        ('value="0"' in html_lower and "dropdown" in html_lower)
+    ):
+        return "disponivel"
 
-    # ❌ indisponível
-    if "currently unavailable" in t:
-        return False
+    return "fechado"
 
-    # 🥇 ULTRA - dropdown real (0 ▼)
-    if any(x in t for x in ["<select", "option value", "quantity"]):
-        return "ULTRA"
+# 🌐 ACESSO HUMANIZADO
+def checar(nome, url):
+    try:
+        # visita home primeiro (simula usuário real)
+        session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
 
-    # 🥈 CONFIRMADO - botão ativo
-    if "add to cart" in t and "disabled" not in t:
-        return "CONFIRMADO"
+        time.sleep(random.uniform(2, 4))
 
-    # 🟡 pré-sinal
-    if "high demand" in t:
-        return "QUASE"
+        # acessa página do jogo
+        r = session.get(url, headers=get_headers(), timeout=10)
 
-    return False
+        status = detectar(r.text)
 
+        return nome, url, status
 
-# 🌐 servidor fake
+    except Exception as e:
+        enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
+        return nome, url, None
+
+# 🌐 servidor fake (Render precisa disso)
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "online"
+    return "Bot rodando"
 
-
+# 🚀 BOT PRINCIPAL
 def rodar():
-    enviar("🕵️ BOT STEALTH + SNIPER ATIVO")
-
-    # 🔥 gera cookies reais
-    try:
-        session.get("https://tickets.fifa.com", headers=HEADERS, timeout=10)
-        time.sleep(random.uniform(2, 5))
-    except:
-        pass
+    enviar("🕵️ BOT STEALTH HUMANO ATIVO")
 
     enviados = set()
-    ultimo_heartbeat = time.time()
-    delay_base = 12
 
     while True:
-        try:
-            print("🔄 Verificando...")
+        for nome, url in URLS:
 
-            for nome, url in URLS:
-                try:
-                    # ⏱️ comportamento humano
-                    time.sleep(random.uniform(1.5, 4))
+            nome, url, status = checar(nome, url)
 
-                    r = session.get(url, headers=HEADERS, timeout=10)
-                    status = detectar(r.text)
+            if status == "bloqueado":
+                enviar(f"🛑 BLOQUEADO (fila/captcha)\n{nome}")
 
-                    if not status:
-                        continue
+            elif status == "disponivel":
+                if nome not in enviados:
+                    enviar(f"🚨 INGRESSOS DISPONÍVEIS!\n\n{nome}\n👉 {url}")
+                    enviados.add(nome)
 
-                    chave = f"{status}-{nome}"
-                    if chave in enviados:
-                        continue
+            else:
+                print(f"{nome}: fechado")
 
-                    if status == "ULTRA":
-                        enviar(f"🔥🔥🔥 ULTRA SNIPER\n\n{nome}\n👉 {url}")
-                        delay_base = 6
+            # ⏱ delay humano entre jogos
+            time.sleep(random.uniform(4, 8))
 
-                    elif status == "CONFIRMADO":
-                        enviar(f"🚨 INGRESSOS DISPONÍVEIS\n\n{nome}\n👉 {url}")
-                        delay_base = 8
+        # ⏱ pausa entre ciclos
+        time.sleep(random.uniform(8, 15))
 
-                    elif status == "QUASE":
-                        enviar(f"⚠️ POSSÍVEL ABERTURA\n\n{nome}")
-                        delay_base = 10
-
-                    elif status == "BLOQUEADO":
-                        enviar(f"🛑 BLOQUEADO (fila/captcha)\n{nome}")
-                        delay_base = 25
-
-                    elif status == "BANIDO":
-                        enviar(f"⛔ ACESSO NEGADO\n{nome}")
-                        delay_base = 60
-
-                    enviados.add(chave)
-
-                except Exception as e:
-                    enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
-
-            # ❤️ heartbeat
-            if time.time() - ultimo_heartbeat > 600:
-                enviar("🤖 Bot ativo (stealth)")
-                ultimo_heartbeat = time.time()
-
-            # ⏱️ delay variável
-            delay = random.uniform(delay_base, delay_base + 5)
-            time.sleep(delay)
-
-        except Exception as e:
-            enviar(f"🔥 ERRO CRÍTICO\n{str(e)}")
-            time.sleep(60)
-
-
+# 🚀 INICIAR
 if __name__ == "__main__":
+    import threading
     threading.Thread(target=rodar).start()
     app.run(host="0.0.0.0", port=10000)
