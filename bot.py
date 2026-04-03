@@ -3,7 +3,7 @@ import time
 import os
 
 TOKEN = "8507528681:AAFLwuapM0KwJ4mJ9pNQ_kikTA7pQL30k1Q"
-CHAT_ID = "5345823250"
+CHAT_ID = "8507528681"
 
 URLS = {
     "Brasil x Marrocos": "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891",
