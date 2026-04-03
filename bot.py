@@ -1,4 +1,5 @@
 import time
+import random
 import requests
 from playwright.sync_api import sync_playwright
 
@@ -29,30 +30,26 @@ def enviar_telegram(msg):
         pass
 
 # =========================
-# DETECÇÃO MELHORADA FIFA
+# DETECÇÃO FIFA
 # =========================
 
 def verificar_pagina(page, nome):
     html = page.content().lower()
 
-    # 🚫 bloqueio / fila / captcha
     if any(x in html for x in ["captcha", "queue", "fila", "blocked"]):
         print(f"🔒 {nome} -> bloqueado (fila/captcha)")
         return "bloqueado"
 
-    # 🚨 botão ativo
     if any(x in html for x in ["add to cart", "buy", "purchase"]):
         print(f"🚨 {nome} -> DISPONÍVEL")
         enviar_telegram(f"🚨 INGRESSO DISPONÍVEL: {nome}")
         return "disponivel"
 
-    # 🟡 dropdown com 0 (sinal clássico FIFA)
     if "option" in html and ">0<" in html:
-        print(f"🟡 {nome} -> dropdown ativo (pré-liberação)")
+        print(f"🟡 {nome} -> dropdown ativo")
         enviar_telegram(f"🟡 POSSÍVEL LIBERAÇÃO: {nome}")
         return "quase"
 
-    # 🧠 fallback inteligente
     if any(x in html for x in ["unavailable", "sold out", "not available"]):
         print(f"⚪ {nome} -> fechado")
         return "fechado"
@@ -73,7 +70,16 @@ def main():
             args=["--no-sandbox", "--disable-setuid-sandbox"]
         )
 
-        context = browser.new_context()
+        # 🧠 CONTEXTO HUMANIZADO
+        context = browser.new_context(
+            user_agent=random.choice([
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/119.0.0.0 Safari/537.36"
+            ]),
+            viewport={"width": random.choice([1366, 1440, 1536]), "height": random.choice([768, 900, 864])},
+            locale="en-US"
+        )
+
         page = context.new_page()
 
         while True:
@@ -81,26 +87,31 @@ def main():
 
             for nome, link in LINKS.items():
                 try:
+                    print(f"🌐 Acessando {nome}...")
+
                     page.goto(link, timeout=60000)
 
-                    # espera leve pra renderizar (importante FIFA)
-                    time.sleep(3)
+                    # ⏱️ tempo humano variável
+                    time.sleep(random.uniform(3, 5))
 
                     status = verificar_pagina(page, nome)
 
+                    # ⏳ delays inteligentes
                     if status == "bloqueado":
-                        time.sleep(12)
+                        print("🧊 cooldown ativado...")
+                        time.sleep(random.uniform(12, 18))
                     elif status == "quase":
-                        time.sleep(6)
+                        time.sleep(random.uniform(6, 10))
                     else:
-                        time.sleep(4)
+                        time.sleep(random.uniform(5, 8))
 
                 except Exception as e:
                     print(f"❌ Erro em {nome}: {e}")
-                    time.sleep(5)
+                    time.sleep(6)
 
-            # pausa entre ciclos
-            time.sleep(8)
+            # ⏳ pausa geral (SUPER IMPORTANTE)
+            print("⏳ aguardando próximo ciclo...\n")
+            time.sleep(random.uniform(12, 20))
 
 # =========================
 
