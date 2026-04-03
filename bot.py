@@ -1,7 +1,6 @@
 import time
 import random
 import requests
-import os
 from playwright.sync_api import sync_playwright
 
 # ============================
@@ -16,7 +15,8 @@ LINKS = {
 TELEGRAM_TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
-INIT_FILE = "started.flag"
+# controle de envio (evita spam)
+ultima_msg_inicio = 0
 
 # ============================
 # TELEGRAM
@@ -40,35 +40,29 @@ def enviar_telegram(msg):
 def verificar_pagina(page, nome):
     html = page.content().lower()
 
-    # BLOQUEIO
     if "captcha" in html or "blocked" in html:
         print(f"🔒 {nome} -> bloqueado")
         return "bloqueado"
 
-    # DISPONÍVEL (principal)
     if "add to cart" in html:
-        print(f"🚨 {nome} -> DISPONÍVEL (add to cart)")
+        print(f"🚨 {nome} -> DISPONÍVEL")
         enviar_telegram(f"🚨 INGRESSO DISPONÍVEL: {nome}")
         return "disponivel"
 
-    # BOTÃO CONTINUE ATIVO
     if "continue" in html and "disabled" not in html:
-        print(f"🚨 {nome} -> possível compra liberada")
-        enviar_telegram(f"🚨 POSSÍVEL COMPRA LIBERADA: {nome}")
+        print(f"🚨 {nome} -> compra liberada")
+        enviar_telegram(f"🚨 POSSÍVEL COMPRA: {nome}")
         return "disponivel"
 
-    # DROPDOWN / QUANTIDADE
     if "option" in html and (">0<" in html or ">1<" in html or ">2<" in html):
         print(f"🟡 {nome} -> quantidade detectada")
         enviar_telegram(f"🟡 QUANTIDADE DISPONÍVEL: {nome}")
         return "quase"
 
-    # TELA DE ASSENTOS
     if "seat" in html or "table" in html:
-        print(f"🟡 {nome} -> tela de seleção carregada")
+        print(f"🟡 {nome} -> tela carregando")
         return "quase"
 
-    # ESGOTADO
     if "sold out" in html:
         print(f"❌ {nome} -> esgotado")
         return "fechado"
@@ -81,6 +75,8 @@ def verificar_pagina(page, nome):
 # ============================
 
 def rodar():
+    global ultima_msg_inicio
+
     with sync_playwright() as p:
 
         browser = p.chromium.launch(
@@ -100,6 +96,11 @@ def rodar():
             ])
         )
 
+        # envia mensagem apenas 1 vez a cada 10 minutos
+        if time.time() - ultima_msg_inicio > 600:
+            enviar_telegram("🤖 BOT INICIADO COM SUCESSO")
+            ultima_msg_inicio = time.time()
+
         while True:
             print("\n🔄 NOVO CICLO ----------------------")
 
@@ -108,7 +109,6 @@ def rodar():
 
                 try:
                     page.goto(link, timeout=60000)
-
                     time.sleep(random.uniform(3, 6))
 
                     status = verificar_pagina(page, nome)
@@ -127,16 +127,11 @@ def rodar():
 
             time.sleep(random.uniform(20, 40))
 
+
 # ============================
-# START CONTROLADO
+# START
 # ============================
 
 if __name__ == "__main__":
     print("🚀 BOT INICIANDO...")
-
-    if not os.path.exists(INIT_FILE):
-        enviar_telegram("🤖 BOT INICIADO COM SUCESSO")
-        with open(INIT_FILE, "w") as f:
-            f.write("ok")
-
     rodar()
