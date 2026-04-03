@@ -1,99 +1,105 @@
 import time
 import random
-import threading
-import requests
-from flask import Flask
 from playwright.sync_api import sync_playwright
+import requests
 
-# 🔑 CONFIGURE AQUI
-TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
+# ==============================
+# CONFIG
+# ==============================
+
+TELEGRAM_TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
-URLS = [
-    ("Brasil x Marrocos", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891"),
-    ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917")
-]
+LINKS = {
+    "Brasil x Marrocos": "COLE_LINK_AQUI",
+    "Brasil x Haiti": "COLE_LINK_AQUI"
+}
 
-def enviar(msg):
+# ==============================
+# TELEGRAM
+# ==============================
+
+def enviar_telegram(msg):
     try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, json={
-            "chat_id": CHAT_ID,
-            "text": msg
-        }, timeout=10)
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
     except:
-        print("Erro ao enviar mensagem", flush=True)
+        pass
 
-def detectar(html):
-    html = html.lower()
+# ==============================
+# DETECÇÃO
+# ==============================
 
-    if "captcha" in html or "queue" in html:
+def verificar_pagina(page, nome):
+    html = page.content()
+
+    # sinais de bloqueio
+    if "captcha" in html.lower():
+        print(f"🔒 {nome} → bloqueado")
         return "bloqueado"
 
-    if "currently unavailable" in html:
-        return "fechado"
-
-    if (
-        'value="0"' in html or
-        "add to cart" in html or
-        "buy tickets" in html or
-        "select your seats" in html or
-        "last minute sales" in html
-    ):
+    # botão add to cart ativo
+    if "Add to cart" in html or "add to cart" in html:
+        print(f"🚨 {nome} → DISPONÍVEL")
+        enviar_telegram(f"🚨 INGRESSO DISPONÍVEL: {nome}")
         return "disponivel"
 
+    # dropdown (0 com seta)
+    if "option" in html and "0" in html:
+        print(f"🟡 {nome} → dropdown ativo")
+        enviar_telegram(f"🟡 POSSÍVEL LIBERAÇÃO: {nome}")
+        return "quase"
+
+    print(f"🔎 {nome} → fechado")
     return "fechado"
 
-def rodar_bot():
-    print("🚀 BOT ELITE INICIANDO...", flush=True)
-    enviar("🚀 BOT ELITE (BROWSER REAL) ATIVO")
+# ==============================
+# BOT PRINCIPAL
+# ==============================
 
-    enviados = set()
+def rodar():
+    print("🚀 BOT ELITE (BROWSER REAL) ATIVO")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
 
         while True:
-            print("🔁 NOVO CICLO -----------------", flush=True)
+            print("\n🔁 NOVO CICLO ----------------")
 
-            for nome, url in URLS:
+            for nome, link in LINKS.items():
+                context = browser.new_context(
+                    user_agent=random.choice([
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+                        "Mozilla/5.0 (X11; Linux x86_64)"
+                    ])
+                )
+
+                page = context.new_page()
+
                 try:
-                    print(f"🌐 Acessando {nome}", flush=True)
+                    print(f"🌐 Acessando {nome}")
+                    page.goto(link, timeout=60000)
 
-                    page.goto(url, timeout=60000)
                     time.sleep(random.uniform(3, 6))
 
-                    html = page.content()
-                    status = detectar(html)
-
-                    print(f"🔎 {nome} → {status}", flush=True)
-
-                    if status == "bloqueado":
-                        enviar(f"🛑 BLOQUEADO (captcha/fila)\n{nome}")
-                        time.sleep(random.uniform(20, 40))
-                        continue
-
-                    if status == "disponivel":
-                        if nome not in enviados:
-                            enviar(f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}")
-                            enviados.add(nome)
-
-                    time.sleep(random.uniform(5, 10))
+                    verificar_pagina(page, nome)
 
                 except Exception as e:
-                    enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
+                    print(f"⚠️ Erro em {nome}: {e}")
 
-            time.sleep(random.uniform(15, 30))
+                finally:
+                    context.close()
 
-# 🌐 servidor (Render)
-app = Flask(__name__)
+                time.sleep(random.uniform(5, 10))
 
-@app.route('/')
-def home():
-    return "Bot rodando"
+            # pausa maior pra evitar bloqueio
+            time.sleep(random.uniform(20, 40))
+
+
+# ==============================
+# START
+# ==============================
 
 if __name__ == "__main__":
-    threading.Thread(target=rodar_bot).start()
-    app.run(host="0.0.0.0", port=10000)
+    rodar()
