@@ -13,9 +13,8 @@ URLS = [
     ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917"),
 ]
 
-# 🧠 HEADERS mais “humanos”
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
     "Accept-Language": "en-US,en;q=0.9",
     "Connection": "keep-alive",
@@ -32,35 +31,37 @@ def enviar(msg):
         print("Erro ao enviar mensagem")
 
 
-# 🧠 DETECÇÃO ULTRA (focada no dropdown)
+# 🧠 DETECÇÃO FINAL
 def detectar(html):
     t = html.lower()
 
-    # bloqueios
+    # 🚫 bloqueios
     if "captcha" in t or "queue" in t:
         return "BLOQUEADO"
 
     if "access denied" in t:
         return "BANIDO"
 
-    # indisponível
+    # ❌ indisponível
     if "currently unavailable" in t:
         return False
 
-    # 🔥 dropdown real (0 ▼)
-    if any(x in t for x in ["<select", "option value", "quantity", "select quantity"]):
+    # 🥇 ULTRA - dropdown real (0 ▼)
+    if any(x in t for x in ["<select", "option value", "quantity"]):
         return "ULTRA"
 
-    if "add to cart" in t:
+    # 🥈 CONFIRMADO - botão ativo
+    if "add to cart" in t and "disabled" not in t:
         return "CONFIRMADO"
 
+    # 🟡 pré-sinal
     if "high demand" in t:
         return "QUASE"
 
     return False
 
 
-# 🌐 servidor fake (Render)
+# 🌐 servidor fake
 app = Flask(__name__)
 
 @app.route('/')
@@ -69,9 +70,9 @@ def home():
 
 
 def rodar():
-    enviar("🕵️ BOT STEALTH ATIVO")
+    enviar("🕵️ BOT STEALTH + SNIPER ATIVO")
 
-    # 🔥 visita inicial (gera cookies reais)
+    # 🔥 gera cookies reais
     try:
         session.get("https://tickets.fifa.com", headers=HEADERS, timeout=10)
         time.sleep(random.uniform(2, 5))
@@ -80,8 +81,6 @@ def rodar():
 
     enviados = set()
     ultimo_heartbeat = time.time()
-
-    # delay base (vai variar)
     delay_base = 12
 
     while True:
@@ -90,8 +89,8 @@ def rodar():
 
             for nome, url in URLS:
                 try:
-                    # ⏱️ jitter humano (variação)
-                    time.sleep(random.uniform(1.5, 4.0))
+                    # ⏱️ comportamento humano
+                    time.sleep(random.uniform(1.5, 4))
 
                     r = session.get(url, headers=HEADERS, timeout=10)
                     status = detectar(r.text)
@@ -105,23 +104,23 @@ def rodar():
 
                     if status == "ULTRA":
                         enviar(f"🔥🔥🔥 ULTRA SNIPER\n\n{nome}\n👉 {url}")
-                        delay_base = 6  # acelera, mas sem exagero
+                        delay_base = 6
 
                     elif status == "CONFIRMADO":
-                        enviar(f"🚨 INGRESSOS\n\n{nome}\n👉 {url}")
+                        enviar(f"🚨 INGRESSOS DISPONÍVEIS\n\n{nome}\n👉 {url}")
                         delay_base = 8
 
                     elif status == "QUASE":
-                        enviar(f"⚠️ FIQUE ATENTO\n\n{nome}")
+                        enviar(f"⚠️ POSSÍVEL ABERTURA\n\n{nome}")
                         delay_base = 10
 
                     elif status == "BLOQUEADO":
                         enviar(f"🛑 BLOQUEADO (fila/captcha)\n{nome}")
-                        delay_base = 25  # desacelera
+                        delay_base = 25
 
                     elif status == "BANIDO":
                         enviar(f"⛔ ACESSO NEGADO\n{nome}")
-                        delay_base = 60  # segura forte
+                        delay_base = 60
 
                     enviados.add(chave)
 
@@ -133,7 +132,7 @@ def rodar():
                 enviar("🤖 Bot ativo (stealth)")
                 ultimo_heartbeat = time.time()
 
-            # ⏱️ delay com variação (anti-padrão)
+            # ⏱️ delay variável
             delay = random.uniform(delay_base, delay_base + 5)
             time.sleep(delay)
 
