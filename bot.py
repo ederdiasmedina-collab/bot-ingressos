@@ -12,13 +12,14 @@ URLS = [
     ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917")
 ]
 
-# 🌐 sessão persistente (MUITO IMPORTANTE)
-session = requests.Session()
+# 🔥 múltiplas sessões
+sessions = [requests.Session() for _ in range(4)]
 
 HEADERS_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)"
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
+    "Mozilla/5.0 (Linux; Android 10)"
 ]
 
 def get_headers():
@@ -38,19 +39,25 @@ def enviar(msg):
     except:
         print("Erro ao enviar mensagem")
 
-# 🔎 DETECÇÃO INTELIGENTE
+# 🔎 DETECÇÃO ULTRA (BASEADA NOS PRINTS)
 def detectar(html):
-    html_lower = html.lower()
+    html = html.lower()
 
-    # 🚫 BLOQUEIO
-    if "captcha" in html_lower or "queue" in html_lower:
+    # 🛑 BLOQUEIO
+    if "captcha" in html or "queue" in html:
         return "bloqueado"
 
-    # 🔥 DISPONÍVEL (3 sinais fortes)
+    # 🚫 FECHADO (prioridade alta)
+    if "currently unavailable" in html:
+        return "fechado"
+
+    # 🔥 DISPONÍVEL (SINAIS REAIS)
     if (
-        "add to cart" in html_lower or
-        "buy tickets" in html_lower or
-        ('value="0"' in html_lower and "dropdown" in html_lower)
+        'value="0"' in html or                  # dropdown
+        "add to cart" in html or
+        "buy tickets" in html or
+        "select your seats" in html or
+        "last minute sales" in html
     ):
         return "disponivel"
 
@@ -59,12 +66,14 @@ def detectar(html):
 # 🌐 ACESSO HUMANIZADO
 def checar(nome, url):
     try:
-        # visita home primeiro (simula usuário real)
+        session = random.choice(sessions)
+
+        # visita home (gera sessão)
         session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
 
-        time.sleep(random.uniform(2, 4))
+        time.sleep(random.uniform(1.5, 3))
 
-        # acessa página do jogo
+        # acessa página real
         r = session.get(url, headers=get_headers(), timeout=10)
 
         status = detectar(r.text)
@@ -75,7 +84,7 @@ def checar(nome, url):
         enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
         return nome, url, None
 
-# 🌐 servidor fake (Render precisa disso)
+# 🌐 servidor fake (Render)
 app = Flask(__name__)
 
 @app.route('/')
@@ -84,7 +93,7 @@ def home():
 
 # 🚀 BOT PRINCIPAL
 def rodar():
-    enviar("🕵️ BOT STEALTH HUMANO ATIVO")
+    enviar("🚀 ULTRA SNIPER FIFA ATIVO")
 
     enviados = set()
 
@@ -93,24 +102,29 @@ def rodar():
 
             nome, url, status = checar(nome, url)
 
+            # 🛑 BLOQUEADO → ignora
             if status == "bloqueado":
-                enviar(f"🛑 BLOQUEADO (fila/captcha)\n{nome}")
+                print(f"{nome}: bloqueado (ignorando)")
+                time.sleep(random.uniform(5, 10))
+                continue
 
+            # 🔥 DISPONÍVEL
             elif status == "disponivel":
                 if nome not in enviados:
-                    enviar(f"🚨 INGRESSOS DISPONÍVEIS!\n\n{nome}\n👉 {url}")
+                    enviar(f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}")
                     enviados.add(nome)
 
+            # ❌ FECHADO
             else:
                 print(f"{nome}: fechado")
 
-            # ⏱ delay humano entre jogos
-            time.sleep(random.uniform(4, 8))
+            # ⏱ delay entre jogos
+            time.sleep(random.uniform(2.5, 5))
 
-        # ⏱ pausa entre ciclos
-        time.sleep(random.uniform(8, 15))
+        # 🔁 ciclo completo
+        time.sleep(random.uniform(5, 8))
 
-# 🚀 INICIAR
+# 🚀 START
 if __name__ == "__main__":
     import threading
     threading.Thread(target=rodar).start()
