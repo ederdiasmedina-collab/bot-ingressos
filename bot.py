@@ -1,9 +1,11 @@
 import requests
 import time
-import os
+import threading
+from flask import Flask
 
-TOKEN = "8507528681:AAFLwuapM0KwJ4mJ9pNQ_kikTA7pQL30k1Q"
-CHAT_ID = "8507528681"
+# 🔑 CONFIGURE AQUI
+TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
+CHAT_ID = "5345823250"
 
 URLS = {
     "Brasil x Marrocos": "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891",
@@ -15,11 +17,14 @@ HEADERS = {
 }
 
 def enviar_mensagem(msg):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": CHAT_ID,
-        "text": msg
-    })
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, json={
+            "chat_id": CHAT_ID,
+            "text": msg
+        }, timeout=10)
+    except:
+        print("Erro ao enviar mensagem")
 
 def verificar():
     liberado = []
@@ -28,7 +33,7 @@ def verificar():
         try:
             r = requests.get(url, headers=HEADERS, timeout=10)
 
-            # 🔥 CORREÇÃO PRINCIPAL (evita falso alerta)
+            # 🔥 DETECÇÃO REAL (sem falso alerta)
             if "Buy tickets" in r.text or "Add to cart" in r.text:
                 liberado.append(f"{nome}\n👉 {url}")
 
@@ -37,8 +42,7 @@ def verificar():
 
     return liberado
 
-# 👇 servidor fake pra manter online (OBRIGATÓRIO no plano free)
-from flask import Flask
+# 🌐 servidor fake (OBRIGATÓRIO no plano free)
 app = Flask(__name__)
 
 @app.route('/')
@@ -46,6 +50,9 @@ def home():
     return "Bot rodando"
 
 def rodar_bot():
+    # ✅ TESTE DE INÍCIO
+    enviar_mensagem("✅ BOT INICIADO (Render)")
+
     print("🔎 Monitorando ingressos...")
     enviados = set()
 
@@ -62,11 +69,9 @@ def rodar_bot():
                 enviar_mensagem(msg)
                 enviados.update(novos)
 
-        time.sleep(30)  # 🔥 velocidade (30s)
+        time.sleep(30)
 
-# 👇 roda os dois juntos
-import threading
-
+# 🚀 roda tudo junto
 if __name__ == "__main__":
     threading.Thread(target=rodar_bot).start()
     app.run(host="0.0.0.0", port=10000)
