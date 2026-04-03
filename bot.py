@@ -39,21 +39,21 @@ def enviar(msg):
     except:
         print("Erro ao enviar mensagem")
 
-# 🔎 DETECÇÃO ULTRA (BASEADA NOS PRINTS)
+# 🔎 DETECÇÃO COMPLETA
 def detectar(html):
     html = html.lower()
 
-    # 🛑 BLOQUEIO
+    # 🛑 bloqueio
     if "captcha" in html or "queue" in html:
         return "bloqueado"
 
-    # 🚫 FECHADO (prioridade alta)
+    # ❌ fechado
     if "currently unavailable" in html:
         return "fechado"
 
-    # 🔥 DISPONÍVEL (SINAIS REAIS)
+    # 🔥 disponível
     if (
-        'value="0"' in html or                  # dropdown
+        'value="0"' in html or
         "add to cart" in html or
         "buy tickets" in html or
         "select your seats" in html or
@@ -68,12 +68,12 @@ def checar(nome, url):
     try:
         session = random.choice(sessions)
 
-        # visita home (gera sessão)
+        # visita home primeiro
         session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
 
         time.sleep(random.uniform(1.5, 3))
 
-        # acessa página real
+        # acessa página do jogo
         r = session.get(url, headers=get_headers(), timeout=10)
 
         status = detectar(r.text)
@@ -98,30 +98,29 @@ def rodar():
     enviados = set()
 
     while True:
+        print("🔁 NOVO CICLO ---------------------")
+
         for nome, url in URLS:
 
             nome, url, status = checar(nome, url)
 
-            # 🛑 BLOQUEADO → ignora
+            print(f"🔎 {nome} → {status}")
+
+            # 🛑 bloqueado (ignora)
             if status == "bloqueado":
-                print(f"{nome}: bloqueado (ignorando)")
                 time.sleep(random.uniform(5, 10))
                 continue
 
-            # 🔥 DISPONÍVEL
+            # 🔥 disponível
             elif status == "disponivel":
                 if nome not in enviados:
                     enviar(f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}")
                     enviados.add(nome)
 
-            # ❌ FECHADO
-            else:
-                print(f"{nome}: fechado")
-
             # ⏱ delay entre jogos
             time.sleep(random.uniform(2.5, 5))
 
-        # 🔁 ciclo completo
+        # 🔁 pausa entre ciclos
         time.sleep(random.uniform(5, 8))
 
 # 🚀 START
