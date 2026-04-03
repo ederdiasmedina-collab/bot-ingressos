@@ -16,66 +16,112 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
-session = requests.Session()  # ⚡ MUITO MAIS RÁPIDO
-
+# 📩 envio telegram
 def enviar_mensagem(msg):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        session.post(url, json={
+        requests.post(url, json={
             "chat_id": CHAT_ID,
             "text": msg
-        }, timeout=5)
+        }, timeout=10)
     except:
         print("Erro ao enviar mensagem")
 
-def verificar():
-    liberado = []
+# 🧠 DETECÇÃO ULTRA SNIPER
+def detectar_disponibilidade(html):
+    texto = html.lower()
 
-    for nome, url in URLS.items():
-        try:
-            r = session.get(url, headers=HEADERS, timeout=5)
+    # ❌ bloqueio total
+    if "currently unavailable" in texto:
+        return False
 
-            texto = r.text.lower()
+    # 🟡 sinal antecipado
+    alerta = "high demand" in texto
 
-            # 🔥 DETECÇÃO MAIS FORTE
-            if (
-                "buy tickets" in texto
-                or "add to cart" in texto
-                or "ticket selection" in texto
-            ):
-                liberado.append(f"{nome}\n👉 {url}")
+    # 🟢 sinais ULTRA (dropdown de quantidade)
+    sinais_ultra = [
+        "<select",
+        "option value",
+        "quantity",
+        "select quantity"
+    ]
 
-        except:
-            print("Erro ao acessar:", nome)
+    # 🟢 sinais fortes
+    sinais_fortes = [
+        "add to cart",
+        "buy tickets"
+    ]
 
-    return liberado
+    if any(s in texto for s in sinais_ultra):
+        return "ULTRA"
 
-# 🌐 servidor fake (necessário no free)
+    if any(s in texto for s in sinais_fortes):
+        return "CONFIRMADO"
+
+    if alerta:
+        return "QUASE"
+
+    return False
+
+
+# 🌐 servidor fake (necessário no Render free)
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot rodando"
 
+# 🤖 LOOP PRINCIPAL
 def rodar_bot():
-    enviar_mensagem("✅ BOT SNIPER ATIVO")
+    enviar_mensagem("🚀 TESTE: bot rodando no Render")
+    enviar_mensagem("✅ BOT INICIADO (ULTRA SNIPER)")
 
     enviados = set()
+    delay = 30  # padrão
 
     while True:
-        resultados = verificar()
+        print("🔄 Verificando...")
 
-        if resultados:
-            novos = [r for r in resultados if r not in enviados]
+        resultados = []
 
-            if novos:
-                msg = "🚨 INGRESSOS DETECTADOS!\n\n" + "\n\n".join(novos)
-                enviar_mensagem(msg)
-                enviados.update(novos)
+        for nome, url in URLS.items():
+            try:
+                r = requests.get(url, headers=HEADERS, timeout=10)
+                status = detectar_disponibilidade(r.text)
 
-        time.sleep(10)  # ⚡ MAIS RÁPIDO
+                if status:
+                    resultados.append((status, nome, url))
 
-# 🚀 roda tudo junto
+            except:
+                print("Erro ao acessar:", nome)
+
+        # 🔥 lógica de envio
+        for status, nome, url in resultados:
+
+            chave = f"{status}-{nome}"
+
+            if chave in enviados:
+                continue
+
+            if status == "ULTRA":
+                msg = f"🔥🔥🔥 ULTRA SNIPER!\n\n{nome}\n👉 {url}"
+                delay = 5  # acelera MUITO
+
+            elif status == "CONFIRMADO":
+                msg = f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}"
+                delay = 10
+
+            elif status == "QUASE":
+                msg = f"⚠️ POSSÍVEL ABERTURA!\n\n{nome}"
+                delay = 15
+
+            enviar_mensagem(msg)
+            enviados.add(chave)
+
+        time.sleep(delay)
+
+
+# 🚀 EXECUÇÃO
 if __name__ == "__main__":
     threading.Thread(target=rodar_bot).start()
     app.run(host="0.0.0.0", port=10000)
