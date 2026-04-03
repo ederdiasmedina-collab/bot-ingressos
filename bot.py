@@ -1,7 +1,12 @@
 import time
 import random
 import requests
+import os
+
 from playwright.sync_api import sync_playwright
+
+# força caminho do browser (CRUCIAL no Render)
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 
 # ============================
 # CONFIG
@@ -32,14 +37,13 @@ def enviar(msg):
         pass
 
 # ============================
-# DETECÇÃO MELHORADA
+# DETECÇÃO
 # ============================
 
 def verificar(page, nome):
     html = page.content().lower()
 
     if "captcha" in html or "blocked" in html:
-        print(f"🔒 {nome} BLOQUEADO")
         return "bloqueado"
 
     if "add to cart" in html:
@@ -48,22 +52,18 @@ def verificar(page, nome):
     if "continue" in html and "disabled" not in html:
         return "disponivel"
 
-    if "option" in html:
-        return "quase"
-
     return "fechado"
 
 # ============================
-# ANTI-SPAM TELEGRAM
+# ANTI-SPAM
 # ============================
 
 def alerta(nome, tipo):
     agora = time.time()
-
     chave = f"{nome}_{tipo}"
 
     if chave not in ultimo_alerta or agora - ultimo_alerta[chave] > 300:
-        enviar(f"🚨 {tipo.upper()} → {nome}")
+        enviar(f"🚨 {tipo} → {nome}")
         ultimo_alerta[chave] = agora
 
 # ============================
@@ -79,52 +79,39 @@ def rodar():
             headless=True,
             args=[
                 "--no-sandbox",
+                "--disable-dev-shm-usage",
                 "--disable-blink-features=AutomationControlled"
             ]
         )
 
-        context = browser.new_context(
-            user_agent=random.choice([
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-                "Mozilla/5.0 (X11; Linux x86_64)"
-            ])
-        )
+        context = browser.new_context()
 
-        # mensagem única
         if time.time() - ultima_msg_inicio > 600:
             enviar("🤖 BOT ONLINE")
             ultima_msg_inicio = time.time()
 
         while True:
-            print("\n🔄 NOVO CICLO ----------------")
+            print("\n🔄 NOVO CICLO")
 
             for nome, link in LINKS.items():
                 page = context.new_page()
 
                 try:
                     page.goto(link, timeout=60000)
-
-                    # simula humano
                     time.sleep(random.uniform(4, 8))
-                    page.mouse.move(random.randint(100, 500), random.randint(100, 500))
 
                     status = verificar(page, nome)
 
                     if status == "disponivel":
-                        print(f"🚨 {nome} DISPONÍVEL")
-                        alerta(nome, "INGRESSO DISPONÍVEL")
-
-                    elif status == "quase":
-                        print(f"🟡 {nome} QUASE")
-                        alerta(nome, "QUASE")
+                        print(f"🚨 {nome}")
+                        alerta(nome, "INGRESSO")
 
                     elif status == "bloqueado":
-                        print(f"⛔ {nome} COOLDOWN")
-                        time.sleep(random.uniform(30, 60))
+                        print(f"🔒 {nome}")
+                        time.sleep(30)
 
                     else:
-                        print(f"❌ {nome} fechado")
+                        print(f"❌ {nome}")
 
                 except Exception as e:
                     print("Erro:", e)
@@ -132,14 +119,11 @@ def rodar():
                 finally:
                     page.close()
 
-                time.sleep(random.uniform(10, 20))  # 🔥 MAIS LENTO = menos bloqueio
+                time.sleep(random.uniform(10, 20))
 
-            time.sleep(random.uniform(40, 80))  # 🔥 CICLO MAIS HUMANO
+            time.sleep(random.uniform(40, 80))
 
-# ============================
-# START
-# ============================
 
 if __name__ == "__main__":
-    print("🚀 INICIANDO BOT...")
+    print("🚀 INICIANDO BOT")
     rodar()
