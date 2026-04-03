@@ -25,6 +25,7 @@ def enviar_mensagem(msg):
         }, timeout=10)
     except:
         print("Erro ao enviar mensagem")
+enviar_mensagem("🧪 TESTE: bot rodando no Render")
 
 def verificar():
     liberado = []
