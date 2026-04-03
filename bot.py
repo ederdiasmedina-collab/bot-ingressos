@@ -22,9 +22,16 @@ CHAT_ID = "5345823250"
 def enviar_telegram(msg):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
-    except:
-        pass
+        response = requests.post(url, data={
+            "chat_id": CHAT_ID,
+            "text": msg
+        })
+
+        # DEBUG (importante pra você ver se está funcionando)
+        print("📩 Telegram status:", response.status_code)
+
+    except Exception as e:
+        print("Erro Telegram:", e)
 
 # ============================
 # DETECÇÃO
@@ -58,10 +65,10 @@ def rodar():
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
+            channel="chromium",
             args=[
                 "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-blink-features=AutomationControlled"
+                "--disable-setuid-sandbox"
             ]
         )
 
@@ -106,4 +113,6 @@ def rodar():
 # ============================
 
 if __name__ == "__main__":
+    print("🚀 BOT INICIADO")
+    enviar_telegram("🤖 BOT INICIADO COM SUCESSO")
     rodar()
