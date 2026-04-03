@@ -3,7 +3,6 @@ import time
 import random
 from flask import Flask
 
-# 🔑 CONFIGURE AQUI
 TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
@@ -12,8 +11,15 @@ URLS = [
     ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917")
 ]
 
-# 🔥 múltiplas sessões
-sessions = [requests.Session() for _ in range(4)]
+# 🔥 sessão fixa por jogo
+sessions = {
+    nome: requests.Session() for nome, _ in URLS
+}
+
+# 🔥 controle de bloqueio
+cooldown = {
+    nome: 0 for nome, _ in URLS
+}
 
 HEADERS_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -39,7 +45,6 @@ def enviar(msg):
     except:
         print("Erro ao enviar mensagem", flush=True)
 
-# 🔎 DETECÇÃO COMPLETA
 def detectar(html):
     html = html.lower()
 
@@ -60,50 +65,55 @@ def detectar(html):
 
     return "fechado"
 
-# 🌐 ACESSO HUMANIZADO
 def checar(nome, url):
     try:
-        session = random.choice(sessions)
+        session = sessions[nome]
 
+        # visita home
         session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
 
-        time.sleep(random.uniform(1.5, 3))
+        time.sleep(random.uniform(2, 5))
 
         r = session.get(url, headers=get_headers(), timeout=10)
 
-        status = detectar(r.text)
-
-        return nome, url, status
+        return detectar(r.text)
 
     except Exception as e:
         enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
-        return nome, url, None
+        return None
 
-# 🌐 servidor fake
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot rodando"
 
-# 🚀 BOT PRINCIPAL
 def rodar():
     print("🚀 BOT INICIANDO...", flush=True)
-    enviar("🚀 ULTRA SNIPER FIFA ATIVO")
+    enviar("🚀 ULTRA SNIPER V3 ATIVO")
 
     enviados = set()
 
     while True:
         print("🔁 NOVO CICLO ---------------------", flush=True)
 
+        agora = time.time()
+
         for nome, url in URLS:
 
-            nome, url, status = checar(nome, url)
+            # ⛔ respeita cooldown
+            if agora < cooldown[nome]:
+                print(f"⏳ {nome} em cooldown", flush=True)
+                continue
+
+            status = checar(nome, url)
 
             print(f"🔎 {nome} → {status}", flush=True)
 
             if status == "bloqueado":
-                time.sleep(random.uniform(5, 10))
+                # 🔥 pausa maior se bloqueado
+                cooldown[nome] = time.time() + random.uniform(30, 60)
+                print(f"🛑 {nome} entrou em cooldown", flush=True)
                 continue
 
             elif status == "disponivel":
@@ -111,11 +121,12 @@ def rodar():
                     enviar(f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}")
                     enviados.add(nome)
 
-            time.sleep(random.uniform(2.5, 5))
+            # delay humano entre jogos
+            time.sleep(random.uniform(4, 8))
 
-        time.sleep(random.uniform(5, 8))
+        # pausa geral
+        time.sleep(random.uniform(6, 12))
 
-# 🚀 START
 if __name__ == "__main__":
     import threading
     threading.Thread(target=rodar).start()
