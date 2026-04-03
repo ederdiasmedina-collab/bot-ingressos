@@ -1,6 +1,7 @@
 import time
 import random
 import requests
+import os
 from playwright.sync_api import sync_playwright
 
 # ============================
@@ -15,6 +16,8 @@ LINKS = {
 TELEGRAM_TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
+INIT_FILE = "started.flag"
+
 # ============================
 # TELEGRAM
 # ============================
@@ -26,33 +29,49 @@ def enviar_telegram(msg):
             "chat_id": CHAT_ID,
             "text": msg
         })
-
-        # DEBUG (importante pra você ver se está funcionando)
-        print("📩 Telegram status:", response.status_code)
-
+        print("📩 Telegram:", response.status_code)
     except Exception as e:
         print("Erro Telegram:", e)
 
 # ============================
-# DETECÇÃO
+# DETECÇÃO COMPLETA
 # ============================
 
 def verificar_pagina(page, nome):
     html = page.content().lower()
 
+    # BLOQUEIO
     if "captcha" in html or "blocked" in html:
         print(f"🔒 {nome} -> bloqueado")
         return "bloqueado"
 
+    # DISPONÍVEL (principal)
     if "add to cart" in html:
-        print(f"🚨 {nome} -> DISPONÍVEL")
+        print(f"🚨 {nome} -> DISPONÍVEL (add to cart)")
         enviar_telegram(f"🚨 INGRESSO DISPONÍVEL: {nome}")
         return "disponivel"
 
-    if "option" in html and ">0<" in html:
-        print(f"🟡 {nome} -> possível liberação")
-        enviar_telegram(f"🟡 POSSÍVEL LIBERAÇÃO: {nome}")
+    # BOTÃO CONTINUE ATIVO
+    if "continue" in html and "disabled" not in html:
+        print(f"🚨 {nome} -> possível compra liberada")
+        enviar_telegram(f"🚨 POSSÍVEL COMPRA LIBERADA: {nome}")
+        return "disponivel"
+
+    # DROPDOWN / QUANTIDADE
+    if "option" in html and (">0<" in html or ">1<" in html or ">2<" in html):
+        print(f"🟡 {nome} -> quantidade detectada")
+        enviar_telegram(f"🟡 QUANTIDADE DISPONÍVEL: {nome}")
         return "quase"
+
+    # TELA DE ASSENTOS
+    if "seat" in html or "table" in html:
+        print(f"🟡 {nome} -> tela de seleção carregada")
+        return "quase"
+
+    # ESGOTADO
+    if "sold out" in html:
+        print(f"❌ {nome} -> esgotado")
+        return "fechado"
 
     print(f"🔎 {nome} -> fechado")
     return "fechado"
@@ -63,12 +82,13 @@ def verificar_pagina(page, nome):
 
 def rodar():
     with sync_playwright() as p:
+
         browser = p.chromium.launch(
             headless=True,
-            channel="chromium",
             args=[
                 "--no-sandbox",
-                "--disable-setuid-sandbox"
+                "--disable-setuid-sandbox",
+                "--disable-blink-features=AutomationControlled"
             ]
         )
 
@@ -107,12 +127,16 @@ def rodar():
 
             time.sleep(random.uniform(20, 40))
 
-
 # ============================
-# START
+# START CONTROLADO
 # ============================
 
 if __name__ == "__main__":
-    print("🚀 BOT INICIADO")
-    enviar_telegram("🤖 BOT INICIADO COM SUCESSO")
+    print("🚀 BOT INICIANDO...")
+
+    if not os.path.exists(INIT_FILE):
+        enviar_telegram("🤖 BOT INICIADO COM SUCESSO")
+        with open(INIT_FILE, "w") as f:
+            f.write("ok")
+
     rodar()
