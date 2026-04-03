@@ -1,105 +1,108 @@
 import time
-import random
-from playwright.sync_api import sync_playwright
 import requests
+from playwright.sync_api import sync_playwright
 
-# ==============================
+# =========================
 # CONFIG
-# ==============================
+# =========================
 
 TELEGRAM_TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
 LINKS = {
-    "Brasil x Marrocos": "COLE_LINK_AQUI",
-    "Brasil x Haiti": "COLE_LINK_AQUI"
+    "Brasil x Marrocos": "https://fwc26-shop-usd.tickets.fifa.com/secure/selection/event/seat/performance/10229226700891/contact-advantages/10229997072863,10230003371090/table/1/lang/en",
+    "Brasil x Haiti": "https://fwc26-shop-usd.tickets.fifa.com/secure/selection/event/seat/performance/10229226700917/contact-advantages/10229997072863,10230003371090/table/1/lang/en"
 }
 
-# ==============================
+# =========================
 # TELEGRAM
-# ==============================
+# =========================
 
 def enviar_telegram(msg):
+    if TELEGRAM_TOKEN == "" or CHAT_ID == "":
+        print(f"[TELEGRAM OFF] {msg}")
+        return
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
     except:
         pass
 
-# ==============================
-# DETECÇÃO
-# ==============================
+# =========================
+# DETECÇÃO MELHORADA FIFA
+# =========================
 
 def verificar_pagina(page, nome):
-    html = page.content()
+    html = page.content().lower()
 
-    # sinais de bloqueio
-    if "captcha" in html.lower():
-        print(f"🔒 {nome} → bloqueado")
+    # 🚫 bloqueio / fila / captcha
+    if any(x in html for x in ["captcha", "queue", "fila", "blocked"]):
+        print(f"🔒 {nome} -> bloqueado (fila/captcha)")
         return "bloqueado"
 
-    # botão add to cart ativo
-    if "Add to cart" in html or "add to cart" in html:
-        print(f"🚨 {nome} → DISPONÍVEL")
+    # 🚨 botão ativo
+    if any(x in html for x in ["add to cart", "buy", "purchase"]):
+        print(f"🚨 {nome} -> DISPONÍVEL")
         enviar_telegram(f"🚨 INGRESSO DISPONÍVEL: {nome}")
         return "disponivel"
 
-    # dropdown (0 com seta)
-    if "option" in html and "0" in html:
-        print(f"🟡 {nome} → dropdown ativo")
+    # 🟡 dropdown com 0 (sinal clássico FIFA)
+    if "option" in html and ">0<" in html:
+        print(f"🟡 {nome} -> dropdown ativo (pré-liberação)")
         enviar_telegram(f"🟡 POSSÍVEL LIBERAÇÃO: {nome}")
         return "quase"
 
-    print(f"🔎 {nome} → fechado")
+    # 🧠 fallback inteligente
+    if any(x in html for x in ["unavailable", "sold out", "not available"]):
+        print(f"⚪ {nome} -> fechado")
+        return "fechado"
+
+    print(f"⚪ {nome} -> fechado (default)")
     return "fechado"
 
-# ==============================
-# BOT PRINCIPAL
-# ==============================
+# =========================
+# LOOP PRINCIPAL
+# =========================
 
-def rodar():
-    print("🚀 BOT ELITE (BROWSER REAL) ATIVO")
+def main():
+    print("🚀 ULTRA SNIPER FIFA ATIVO")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox"]
+        )
+
+        context = browser.new_context()
+        page = context.new_page()
 
         while True:
-            print("\n🔁 NOVO CICLO ----------------")
+            print("\n🔄 NOVO CICLO ----------------------")
 
             for nome, link in LINKS.items():
-                context = browser.new_context(
-                    user_agent=random.choice([
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-                        "Mozilla/5.0 (X11; Linux x86_64)"
-                    ])
-                )
-
-                page = context.new_page()
-
                 try:
-                    print(f"🌐 Acessando {nome}")
                     page.goto(link, timeout=60000)
 
-                    time.sleep(random.uniform(3, 6))
+                    # espera leve pra renderizar (importante FIFA)
+                    time.sleep(3)
 
-                    verificar_pagina(page, nome)
+                    status = verificar_pagina(page, nome)
+
+                    if status == "bloqueado":
+                        time.sleep(12)
+                    elif status == "quase":
+                        time.sleep(6)
+                    else:
+                        time.sleep(4)
 
                 except Exception as e:
-                    print(f"⚠️ Erro em {nome}: {e}")
+                    print(f"❌ Erro em {nome}: {e}")
+                    time.sleep(5)
 
-                finally:
-                    context.close()
+            # pausa entre ciclos
+            time.sleep(8)
 
-                time.sleep(random.uniform(5, 10))
-
-            # pausa maior pra evitar bloqueio
-            time.sleep(random.uniform(20, 40))
-
-
-# ==============================
-# START
-# ==============================
+# =========================
 
 if __name__ == "__main__":
-    rodar()
+    main()
