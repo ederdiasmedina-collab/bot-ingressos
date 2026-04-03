@@ -4,7 +4,7 @@ import threading
 from flask import Flask
 
 # 🔑 CONFIGURE AQUI
-TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
+TOKEN = "8507528681: AAEK836H9FfVZ0ZdoGBgCSR~-J4gjX7L—uM"
 CHAT_ID = "5345823250"
 
 URLS = {
@@ -16,13 +16,15 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
+session = requests.Session()  # ⚡ MUITO MAIS RÁPIDO
+
 def enviar_mensagem(msg):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, json={
+        session.post(url, json={
             "chat_id": CHAT_ID,
             "text": msg
-        }, timeout=10)
+        }, timeout=5)
     except:
         print("Erro ao enviar mensagem")
 
@@ -31,10 +33,16 @@ def verificar():
 
     for nome, url in URLS.items():
         try:
-            r = requests.get(url, headers=HEADERS, timeout=10)
+            r = session.get(url, headers=HEADERS, timeout=5)
 
-            # 🔥 DETECÇÃO REAL (sem falso alerta)
-            if "Buy tickets" in r.text or "Add to cart" in r.text:
+            texto = r.text.lower()
+
+            # 🔥 DETECÇÃO MAIS FORTE
+            if (
+                "buy tickets" in texto
+                or "add to cart" in texto
+                or "ticket selection" in texto
+            ):
                 liberado.append(f"{nome}\n👉 {url}")
 
         except:
@@ -42,7 +50,7 @@ def verificar():
 
     return liberado
 
-# 🌐 servidor fake (OBRIGATÓRIO no plano free)
+# 🌐 servidor fake (necessário no free)
 app = Flask(__name__)
 
 @app.route('/')
@@ -50,26 +58,22 @@ def home():
     return "Bot rodando"
 
 def rodar_bot():
-    # ✅ TESTE DE INÍCIO
-    enviar_mensagem("✅ BOT INICIADO (Render)")
+    enviar_mensagem("✅ BOT SNIPER ATIVO")
 
-    print("🔎 Monitorando ingressos...")
     enviados = set()
 
     while True:
-        print("Rodando loop...")
-
         resultados = verificar()
 
         if resultados:
             novos = [r for r in resultados if r not in enviados]
 
             if novos:
-                msg = "🚨 INGRESSOS LIBERADOS!\n\n" + "\n\n".join(novos)
+                msg = "🚨 INGRESSOS DETECTADOS!\n\n" + "\n\n".join(novos)
                 enviar_mensagem(msg)
                 enviados.update(novos)
 
-        time.sleep(30)
+        time.sleep(10)  # ⚡ MAIS RÁPIDO
 
 # 🚀 roda tudo junto
 if __name__ == "__main__":
