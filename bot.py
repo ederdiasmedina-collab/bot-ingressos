@@ -7,121 +7,145 @@ from flask import Flask
 TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
-URLS = {
-    "Brasil x Marrocos": "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891",
-    "Brasil x Haiti": "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917"
-}
+# 🎯 prioridade (Brasil primeiro)
+URLS = [
+    ("Brasil x Marrocos", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700891"),
+    ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917"),
+]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive"
 }
 
-# 📩 envio telegram
-def enviar_mensagem(msg):
+# 🔥 sessão global (cookies + performance)
+session = requests.Session()
+
+def enviar(msg):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, json={
-            "chat_id": CHAT_ID,
-            "text": msg
-        }, timeout=10)
+        session.post(url, json={"chat_id": CHAT_ID, "text": msg}, timeout=5)
     except:
         print("Erro ao enviar mensagem")
 
-# 🧠 DETECÇÃO ULTRA SNIPER
-def detectar_disponibilidade(html):
-    texto = html.lower()
 
-    # ❌ bloqueio total
-    if "currently unavailable" in texto:
+# 🧠 DETECÇÃO ULTRA PRECISA
+def detectar(html):
+    t = html.lower()
+
+    # 🚫 bloqueios
+    if any(x in t for x in ["captcha", "queue", "access denied"]):
+        return "BLOQUEADO"
+
+    # ❌ indisponível
+    if "currently unavailable" in t:
         return False
 
-    # 🟡 sinal antecipado
-    alerta = "high demand" in texto
-
-    # 🟢 sinais ULTRA (dropdown de quantidade)
-    sinais_ultra = [
+    # 🔥 ULTRA: dropdown real (0 ▼)
+    sinais_dropdown = [
         "<select",
         "option value",
         "quantity",
         "select quantity"
     ]
 
-    # 🟢 sinais fortes
-    sinais_fortes = [
-        "add to cart",
-        "buy tickets"
-    ]
-
-    if any(s in texto for s in sinais_ultra):
+    if any(s in t for s in sinais_dropdown):
         return "ULTRA"
 
-    if any(s in texto for s in sinais_fortes):
+    # 🟢 secundário
+    if "add to cart" in t:
         return "CONFIRMADO"
 
-    if alerta:
+    # 🟡 pré-sinal
+    if "high demand" in t:
         return "QUASE"
 
     return False
 
 
-# 🌐 servidor fake (necessário no Render free)
+def checar(nome, url):
+    try:
+        r = session.get(url, headers=HEADERS, timeout=5)
+        return nome, url, detectar(r.text)
+    except Exception as e:
+        enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
+        return nome, url, None
+
+
+# 🌐 servidor fake (Render)
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot rodando"
+    return "online"
 
-# 🤖 LOOP PRINCIPAL
-def rodar_bot():
-    enviar_mensagem("🚀 TESTE: bot rodando no Render")
-    enviar_mensagem("✅ BOT INICIADO (ULTRA SNIPER)")
+
+def rodar():
+    enviar("🚀 BOT ULTRA SNIPER ATIVO")
 
     enviados = set()
-    delay = 30  # padrão
+    delay = 20
+    ultimo_heartbeat = time.time()
 
     while True:
-        print("🔄 Verificando...")
+        try:
+            threads = []
+            resultados = []
 
-        resultados = []
+            # ⚡ paralelo
+            def worker(nome, url):
+                res = checar(nome, url)
+                resultados.append(res)
 
-        for nome, url in URLS.items():
-            try:
-                r = requests.get(url, headers=HEADERS, timeout=10)
-                status = detectar_disponibilidade(r.text)
+            for nome, url in URLS:
+                t = threading.Thread(target=worker, args=(nome, url))
+                t.start()
+                threads.append(t)
 
-                if status:
-                    resultados.append((status, nome, url))
+            for t in threads:
+                t.join()
 
-            except:
-                print("Erro ao acessar:", nome)
+            for nome, url, status in resultados:
 
-        # 🔥 lógica de envio
-        for status, nome, url in resultados:
+                if not status:
+                    continue
 
-            chave = f"{status}-{nome}"
+                chave = f"{status}-{nome}"
+                if chave in enviados:
+                    continue
 
-            if chave in enviados:
-                continue
+                if status == "ULTRA":
+                    enviar(f"🔥🔥🔥 ULTRA SNIPER\n\n{nome}\n👉 {url}")
+                    delay = 3  # ⚡ máximo
 
-            if status == "ULTRA":
-                msg = f"🔥🔥🔥 ULTRA SNIPER!\n\n{nome}\n👉 {url}"
-                delay = 5  # acelera MUITO
+                elif status == "CONFIRMADO":
+                    enviar(f"🚨 INGRESSOS\n\n{nome}\n👉 {url}")
+                    delay = 6
 
-            elif status == "CONFIRMADO":
-                msg = f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}"
-                delay = 10
+                elif status == "QUASE":
+                    enviar(f"⚠️ FIQUE ATENTO\n\n{nome}")
+                    delay = 10
 
-            elif status == "QUASE":
-                msg = f"⚠️ POSSÍVEL ABERTURA!\n\n{nome}"
-                delay = 15
+                elif status == "BLOQUEADO":
+                    enviar(f"🛑 BLOQUEADO\n{nome}")
+                    delay = 60
 
-            enviar_mensagem(msg)
-            enviados.add(chave)
+                enviados.add(chave)
 
-        time.sleep(delay)
+            # ❤️ heartbeat
+            if time.time() - ultimo_heartbeat > 600:
+                enviar("🤖 Bot ativo")
+                ultimo_heartbeat = time.time()
+
+            time.sleep(delay)
+
+        except Exception as e:
+            enviar(f"🔥 ERRO CRÍTICO\n{str(e)}")
+            time.sleep(60)
 
 
-# 🚀 EXECUÇÃO
+# 🚀 execução
 if __name__ == "__main__":
-    threading.Thread(target=rodar_bot).start()
+    threading.Thread(target=rodar).start()
     app.run(host="0.0.0.0", port=10000)
