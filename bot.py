@@ -3,6 +3,7 @@ import time
 import random
 from flask import Flask
 
+# 🔑 CONFIGURE
 TOKEN = "8507528681:AAEK836H9FfVZ0ZdoGBgCSR--J4gjX7L-uM"
 CHAT_ID = "5345823250"
 
@@ -11,21 +12,17 @@ URLS = [
     ("Brasil x Haiti", "https://fwc26-shop-usd.tickets.fifa.com/secured/selection/event/seat?perfId=10229226700917")
 ]
 
-# 🔥 sessão fixa por jogo
-sessions = {
-    nome: requests.Session() for nome, _ in URLS
-}
+# 🔥 sessão separada por jogo
+sessions = {nome: requests.Session() for nome, _ in URLS}
 
-# 🔥 controle de bloqueio
-cooldown = {
-    nome: 0 for nome, _ in URLS
-}
+# ⛔ cooldown inteligente
+cooldown = {nome: 0 for nome, _ in URLS}
 
 HEADERS_LIST = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
-    "Mozilla/5.0 (Linux; Android 10)"
+    "Mozilla/5.0 (Linux; Android 11)"
 ]
 
 def get_headers():
@@ -48,14 +45,17 @@ def enviar(msg):
 def detectar(html):
     html = html.lower()
 
+    # 🚫 bloqueio (captcha/fila)
     if "captcha" in html or "queue" in html:
         return "bloqueado"
 
+    # ❌ fechado
     if "currently unavailable" in html:
         return "fechado"
 
+    # 🔥 DISPONÍVEL (todos sinais que você identificou)
     if (
-        'value="0"' in html or
+        'value="0"' in html or  # dropdown 0 + seta
         "add to cart" in html or
         "buy tickets" in html or
         "select your seats" in html or
@@ -65,14 +65,24 @@ def detectar(html):
 
     return "fechado"
 
+def navegar_como_humano(session):
+    try:
+        # 🌐 simula navegação real
+        session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
+        time.sleep(random.uniform(3, 6))
+
+        session.get("https://tickets.fifa.com/en/", headers=get_headers(), timeout=10)
+        time.sleep(random.uniform(2, 5))
+
+    except:
+        pass
+
 def checar(nome, url):
     try:
         session = sessions[nome]
 
-        # visita home
-        session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
-
-        time.sleep(random.uniform(2, 5))
+        # 👇 simula comportamento humano
+        navegar_como_humano(session)
 
         r = session.get(url, headers=get_headers(), timeout=10)
 
@@ -82,6 +92,7 @@ def checar(nome, url):
         enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
         return None
 
+# 🌐 servidor (Render)
 app = Flask(__name__)
 
 @app.route('/')
@@ -90,7 +101,7 @@ def home():
 
 def rodar():
     print("🚀 BOT INICIANDO...", flush=True)
-    enviar("🚀 ULTRA SNIPER V3 ATIVO")
+    enviar("🚀 ULTRA SNIPER FIFA ATIVO")
 
     enviados = set()
 
@@ -111,7 +122,6 @@ def rodar():
             print(f"🔎 {nome} → {status}", flush=True)
 
             if status == "bloqueado":
-                # 🔥 pausa maior se bloqueado
                 cooldown[nome] = time.time() + random.uniform(30, 60)
                 print(f"🛑 {nome} entrou em cooldown", flush=True)
                 continue
@@ -122,10 +132,10 @@ def rodar():
                     enviados.add(nome)
 
             # delay humano entre jogos
-            time.sleep(random.uniform(4, 8))
+            time.sleep(random.uniform(5, 9))
 
-        # pausa geral
-        time.sleep(random.uniform(6, 12))
+        # 🔥 delay maior entre ciclos (ANTI BLOQUEIO)
+        time.sleep(random.uniform(15, 25))
 
 if __name__ == "__main__":
     import threading
