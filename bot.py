@@ -37,21 +37,18 @@ def enviar(msg):
             "text": msg
         }, timeout=10)
     except:
-        print("Erro ao enviar mensagem")
+        print("Erro ao enviar mensagem", flush=True)
 
 # 🔎 DETECÇÃO COMPLETA
 def detectar(html):
     html = html.lower()
 
-    # 🛑 bloqueio
     if "captcha" in html or "queue" in html:
         return "bloqueado"
 
-    # ❌ fechado
     if "currently unavailable" in html:
         return "fechado"
 
-    # 🔥 disponível
     if (
         'value="0"' in html or
         "add to cart" in html or
@@ -68,12 +65,10 @@ def checar(nome, url):
     try:
         session = random.choice(sessions)
 
-        # visita home primeiro
         session.get("https://tickets.fifa.com", headers=get_headers(), timeout=10)
 
         time.sleep(random.uniform(1.5, 3))
 
-        # acessa página do jogo
         r = session.get(url, headers=get_headers(), timeout=10)
 
         status = detectar(r.text)
@@ -84,7 +79,7 @@ def checar(nome, url):
         enviar(f"⚠️ ERRO\n{nome}\n{str(e)}")
         return nome, url, None
 
-# 🌐 servidor fake (Render)
+# 🌐 servidor fake
 app = Flask(__name__)
 
 @app.route('/')
@@ -93,34 +88,31 @@ def home():
 
 # 🚀 BOT PRINCIPAL
 def rodar():
+    print("🚀 BOT INICIANDO...", flush=True)
     enviar("🚀 ULTRA SNIPER FIFA ATIVO")
 
     enviados = set()
 
     while True:
-        print("🔁 NOVO CICLO ---------------------")
+        print("🔁 NOVO CICLO ---------------------", flush=True)
 
         for nome, url in URLS:
 
             nome, url, status = checar(nome, url)
 
-            print(f"🔎 {nome} → {status}")
+            print(f"🔎 {nome} → {status}", flush=True)
 
-            # 🛑 bloqueado (ignora)
             if status == "bloqueado":
                 time.sleep(random.uniform(5, 10))
                 continue
 
-            # 🔥 disponível
             elif status == "disponivel":
                 if nome not in enviados:
                     enviar(f"🚨 INGRESSOS LIBERADOS!\n\n{nome}\n👉 {url}")
                     enviados.add(nome)
 
-            # ⏱ delay entre jogos
             time.sleep(random.uniform(2.5, 5))
 
-        # 🔁 pausa entre ciclos
         time.sleep(random.uniform(5, 8))
 
 # 🚀 START
